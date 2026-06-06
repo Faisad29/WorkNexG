@@ -2,163 +2,279 @@
 @section('title', 'Employees')
 @section('content')
 
-<div class="page-header" style="display:flex;align-items:center;justify-content:space-between">
+<div class="page-header">
     <div>
         <h1>Employees</h1>
-        <p>Manage your workforce</p>
+        <div class="breadcrumb"><span>Home</span> <span class="sep">›</span> <span>Employees</span></div>
     </div>
-    <button class="btn btn-primary" onclick="openCreateModal()">+ Add Employee</button>
+    <div class="page-actions">
+        <button class="btn btn-ghost btn-sm">⬇ Export</button>
+        <button class="btn btn-primary" onclick="openModal('addEmployeeModal')">+ Add Employee</button>
+    </div>
 </div>
 
+{{-- Summary Stats --}}
+<div class="stats-row" style="margin-bottom:20px">
+    <div class="stat-card"><div class="stat-icon green">👥</div><div class="stat-value" id="sTotal">—</div><div class="stat-label">Total</div></div>
+    <div class="stat-card"><div class="stat-icon primary">✅</div><div class="stat-value" id="sActive">—</div><div class="stat-label">Active</div></div>
+    <div class="stat-card"><div class="stat-icon orange">⏸</div><div class="stat-value" id="sInactive">—</div><div class="stat-label">Inactive</div></div>
+    <div class="stat-card"><div class="stat-icon red">⛔</div><div class="stat-value" id="sSuspended">—</div><div class="stat-label">Suspended</div></div>
+</div>
+
+{{-- Table Card --}}
 <div class="card">
-    <div style="display:flex;gap:12px;margin-bottom:16px">
-        <input type="search" id="searchInput" placeholder="Search by name, code, email..." style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:.875rem">
-        <select id="statusFilter" style="padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:.875rem">
+    {{-- Filters --}}
+    <div class="filters-bar">
+        <div class="search-wrap">
+            <span class="s-icon">🔍</span>
+            <input type="text" id="searchInput" placeholder="Search name, code, email...">
+        </div>
+        <select id="statusFilter" class="form-control" style="width:150px">
             <option value="">All Status</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
             <option value="suspended">Suspended</option>
         </select>
+        <select id="salaryFilter" class="form-control" style="width:160px">
+            <option value="">All Salary Types</option>
+            <option value="monthly">Monthly</option>
+            <option value="daily">Daily</option>
+            <option value="hourly">Hourly</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="resetFilters()">✕ Clear</button>
     </div>
-    <div class="table-wrap">
-        <table id="employeeTable">
+
+    {{-- Table --}}
+    <div class="table-wrapper">
+        <table class="data-table">
             <thead>
                 <tr>
-                    <th>Code</th><th>Name</th><th>Job Title</th><th>Site</th>
-                    <th>Salary Type</th><th>Base Salary</th><th>Status</th><th>Actions</th>
+                    <th><input type="checkbox" id="selectAll" style="cursor:pointer"></th>
+                    <th>Employee</th>
+                    <th>Code</th>
+                    <th>Job Title</th>
+                    <th>Site</th>
+                    <th>Salary Type</th>
+                    <th>Base Salary</th>
+                    <th>Status</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
-            <tbody><tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">Loading...</td></tr></tbody>
+            <tbody id="employeeTableBody">
+                <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">Loading...</td></tr>
+            </tbody>
         </table>
     </div>
-    <div id="pagination" style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"></div>
+
+    {{-- Pagination --}}
+    <div class="pagination-wrap">
+        <span id="paginationInfo">—</span>
+        <div class="pagination-pages" id="paginationPages"></div>
+    </div>
 </div>
 
-<!-- Create Modal -->
-<div id="createModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center">
-    <div style="background:#fff;border-radius:12px;padding:28px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-            <h2 style="font-size:1.1rem;font-weight:700">Add Employee</h2>
-            <button onclick="closeCreateModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--muted)">×</button>
+{{-- Add Employee Modal --}}
+<div class="modal-overlay" id="addEmployeeModal">
+    <div class="modal modal-lg">
+        <div class="modal-header">
+            <div class="modal-title">Add New Employee</div>
+            <button class="modal-close" onclick="closeModal('addEmployeeModal')">✕</button>
         </div>
-        <div class="alert alert-error" id="modalError" style="display:none"></div>
-        <form id="createForm">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-                <div><label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:5px;color:var(--muted)">Employee Code *</label>
-                    <input name="employee_code" required placeholder="EMP-001" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-size:.875rem"></div>
-                <div><label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:5px;color:var(--muted)">Full Name *</label>
-                    <input name="full_name" required placeholder="Ahmed Al-Qahtani" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-size:.875rem"></div>
-                <div><label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:5px;color:var(--muted)">Email</label>
-                    <input name="email" type="email" placeholder="email@example.com" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-size:.875rem"></div>
-                <div><label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:5px;color:var(--muted)">Phone</label>
-                    <input name="phone" placeholder="+966500000000" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-size:.875rem"></div>
-                <div><label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:5px;color:var(--muted)">Job Title</label>
-                    <input name="job_title" placeholder="Software Engineer" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-size:.875rem"></div>
-                <div><label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:5px;color:var(--muted)">Nationality</label>
-                    <input name="nationality" placeholder="Saudi" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-size:.875rem"></div>
-                <div><label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:5px;color:var(--muted)">Salary Type *</label>
-                    <select name="salary_type" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-size:.875rem">
-                        <option value="monthly">Monthly</option>
-                        <option value="daily">Daily</option>
-                        <option value="hourly">Hourly</option>
-                        <option value="project_based">Project Based</option>
-                    </select></div>
-                <div><label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:5px;color:var(--muted)">Base Salary (SAR) *</label>
-                    <input name="base_salary" type="number" step="0.01" required placeholder="8000.00" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-size:.875rem"></div>
-                <div><label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:5px;color:var(--muted)">Join Date</label>
-                    <input name="join_date" type="date" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-size:.875rem"></div>
-                <div><label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:5px;color:var(--muted)">Contract End Date</label>
-                    <input name="contract_end_date" type="date" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-size:.875rem"></div>
-                <div><label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:5px;color:var(--muted)">Status *</label>
-                    <select name="status" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-size:.875rem">
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                        <option value="suspended">Suspended</option>
-                    </select></div>
-            </div>
-            <div style="display:flex;gap:10px;margin-top:20px">
-                <button type="submit" class="btn btn-primary" style="flex:1" id="saveBtn">Save Employee</button>
-                <button type="button" onclick="closeCreateModal()" class="btn btn-outline" style="flex:1">Cancel</button>
-            </div>
-        </form>
+        <div class="modal-body">
+            <div class="alert alert-danger" id="empModalErr" style="display:none"></div>
+            <form id="addEmployeeForm">
+                <div class="form-row cols-2">
+                    <div class="form-group">
+                        <label class="form-label">Employee Code <span class="req">*</span></label>
+                        <input name="employee_code" class="form-control" placeholder="EMP-001" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Full Name <span class="req">*</span></label>
+                        <input name="full_name" class="form-control" placeholder="Ahmed Al-Qahtani" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input name="email" type="email" class="form-control" placeholder="email@company.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Phone</label>
+                        <input name="phone" class="form-control" placeholder="+966500000000">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Job Title</label>
+                        <input name="job_title" class="form-control" placeholder="Software Engineer">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Nationality</label>
+                        <input name="nationality" class="form-control" placeholder="Saudi">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Salary Type <span class="req">*</span></label>
+                        <select name="salary_type" class="form-control" required>
+                            <option value="monthly">Monthly</option>
+                            <option value="daily">Daily</option>
+                            <option value="hourly">Hourly</option>
+                            <option value="project_based">Project Based</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Base Salary (SAR) <span class="req">*</span></label>
+                        <div class="input-group">
+                            <span class="input-prefix">SAR</span>
+                            <input name="base_salary" type="number" step="0.01" class="form-control" placeholder="8000.00" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Join Date</label>
+                        <input name="join_date" type="date" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Contract End Date</label>
+                        <input name="contract_end_date" type="date" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Status <span class="req">*</span></label>
+                        <select name="status" class="form-control" required>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="suspended">Suspended</option>
+                        </select>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="closeModal('addEmployeeModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveEmployee()" id="saveEmpBtn">Save Employee</button>
+        </div>
     </div>
 </div>
 
 @push('scripts')
 <script>
 let currentPage = 1;
+let searchDebounce;
 
 async function loadEmployees(page = 1) {
+    currentPage = page;
     const search = document.getElementById('searchInput').value;
     const status = document.getElementById('statusFilter').value;
+    const salary = document.getElementById('salaryFilter').value;
+    const tbody = document.getElementById('employeeTableBody');
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)"><span class="spinner" style="border-color:var(--primary);border-top-color:transparent"></span> Loading...</td></tr>';
+
     try {
-        const data = await window.api('GET', `/api/employees?page=${page}&search=${encodeURIComponent(search)}&status=${status}`);
-        renderTable(data.data?.data ?? data.data ?? []);
-        renderPagination(data.data);
+        const params = new URLSearchParams({ page, ...(search && {search}), ...(status && {status}), ...(salary && {salary_type:salary}) });
+        const res = await WN.api('GET', `/api/employees?${params}`);
+        const data = res.data;
+        const employees = data?.data ?? (Array.isArray(data) ? data : []);
+        const meta = data?.meta ?? data;
+
+        // Update stats
+        if (meta?.total !== undefined) {
+            document.getElementById('sTotal').textContent = meta.total;
+        }
+
+        renderTable(employees);
+        renderPagination(meta);
     } catch(e) {
-        document.querySelector('#employeeTable tbody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted)">Failed to load employees</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--danger)">Failed to load employees</td></tr>';
     }
 }
 
 function renderTable(employees) {
-    const tbody = document.querySelector('#employeeTable tbody');
+    const tbody = document.getElementById('employeeTableBody');
     if (!employees.length) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">No employees found</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="9">
+            <div class="empty-state">
+                <div class="empty-icon">👥</div>
+                <h3>No employees found</h3>
+                <p>Try adjusting your search or filters</p>
+                <button class="btn btn-primary" onclick="openModal('addEmployeeModal')">+ Add First Employee</button>
+            </div>
+        </td></tr>`;
         return;
     }
+    const statusMap = {active:'success',inactive:'gray',suspended:'danger'};
     tbody.innerHTML = employees.map(e => `
         <tr>
-            <td><code style="background:var(--primary-light);padding:2px 6px;border-radius:4px;font-size:.8rem">${e.employee_code}</code></td>
-            <td><strong>${e.full_name}</strong>${e.email ? `<br><small style="color:var(--muted)">${e.email}</small>` : ''}</td>
+            <td><input type="checkbox" value="${e.id}"></td>
+            <td>
+                <div style="display:flex;align-items:center;gap:10px">
+                    <div class="tbl-avatar">${e.full_name[0]}</div>
+                    <div>
+                        <div style="font-weight:600">${e.full_name}</div>
+                        <div style="font-size:.75rem;color:var(--muted)">${e.email ?? ''}</div>
+                    </div>
+                </div>
+            </td>
+            <td><code style="background:var(--primary-50);padding:2px 7px;border-radius:4px;font-size:.78rem;color:var(--primary)">${e.employee_code}</code></td>
             <td>${e.job_title ?? '—'}</td>
-            <td>${e.site_id ?? '—'}</td>
-            <td><span class="badge badge-blue">${e.salary_type}</span></td>
-            <td>SAR ${parseFloat(e.base_salary).toLocaleString()}</td>
-            <td><span class="badge badge-${e.status === 'active' ? 'green' : e.status === 'inactive' ? 'gray' : 'red'}">${e.status}</span></td>
-            <td><button class="btn btn-outline btn-sm" onclick="viewEmployee('${e.id}')">View</button></td>
+            <td>${e.site?.name ?? '—'}</td>
+            <td><span class="badge badge-info">${e.salary_type}</span></td>
+            <td style="font-weight:600">SAR ${parseFloat(e.base_salary).toLocaleString()}</td>
+            <td><span class="badge badge-${statusMap[e.status]??'gray'}">${e.status}</span></td>
+            <td>
+                <div class="tbl-actions">
+                    <button class="btn btn-ghost btn-icon btn-sm" title="View" onclick="viewEmployee('${e.id}')">👁</button>
+                    <button class="btn btn-outline btn-icon btn-sm" title="Edit" onclick="editEmployee('${e.id}')">✏️</button>
+                </div>
+            </td>
         </tr>`).join('');
 }
 
 function renderPagination(meta) {
-    if (!meta?.last_page || meta.last_page <= 1) { document.getElementById('pagination').innerHTML = ''; return; }
+    const info = document.getElementById('paginationInfo');
+    const pages = document.getElementById('paginationPages');
+    if (!meta?.last_page) { info.textContent = ''; pages.innerHTML = ''; return; }
+    info.textContent = `Showing ${meta.from??1}–${meta.to??meta.total} of ${meta.total} results`;
     let html = '';
-    for (let i = 1; i <= meta.last_page; i++) {
-        html += `<button onclick="loadEmployees(${i})" class="btn btn-sm ${i === meta.current_page ? 'btn-primary' : 'btn-outline'}">${i}</button>`;
+    for (let i = 1; i <= Math.min(meta.last_page, 7); i++) {
+        html += `<button class="pg-btn ${i === meta.current_page ? 'active' : ''}" onclick="loadEmployees(${i})">${i}</button>`;
     }
-    document.getElementById('pagination').innerHTML = html;
+    pages.innerHTML = html;
 }
 
-function openCreateModal() { document.getElementById('createModal').style.display = 'flex'; }
-function closeCreateModal() { document.getElementById('createModal').style.display = 'none'; document.getElementById('createForm').reset(); }
+function resetFilters() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('statusFilter').value = '';
+    document.getElementById('salaryFilter').value = '';
+    loadEmployees(1);
+}
 
-document.getElementById('createForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const saveBtn = document.getElementById('saveBtn');
-    const errAlert = document.getElementById('modalError');
-    const fd = new FormData(this);
+async function saveEmployee() {
+    const btn = document.getElementById('saveEmpBtn');
+    const errEl = document.getElementById('empModalErr');
+    const form = document.getElementById('addEmployeeForm');
+    const fd = new FormData(form);
     const body = {};
-    fd.forEach((v, k) => { if (v) body[k] = v; });
-
-    saveBtn.textContent = 'Saving...'; saveBtn.disabled = true;
-    errAlert.style.display = 'none';
-
+    fd.forEach((v,k) => { if(v) body[k] = v; });
+    errEl.style.display = 'none';
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Saving...';
     try {
-        await window.api('POST', '/api/employees', body);
-        closeCreateModal();
-        loadEmployees();
+        await WN.api('POST', '/api/employees', body);
+        closeModal('addEmployeeModal');
+        form.reset();
+        loadEmployees(1);
+        showToast('Employee added successfully', 'success');
     } catch(err) {
-        const msgs = err.data?.errors ? Object.values(err.data.errors).flat().join(', ') : (err.data?.message || 'Failed to save.');
-        errAlert.textContent = msgs; errAlert.style.display = 'block';
-    } finally {
-        saveBtn.textContent = 'Save Employee'; saveBtn.disabled = false;
-    }
+        const msgs = err.data?.errors ? Object.values(err.data.errors).flat().join(' · ') : (err.data?.message || 'Failed to save.');
+        errEl.textContent = msgs; errEl.style.display = 'block';
+    } finally { btn.innerHTML = 'Save Employee'; btn.disabled = false; }
+}
+
+function viewEmployee(id) { showToast('Employee profile — extend this to a detail page', 'info'); }
+function editEmployee(id) { showToast('Edit employee — extend this to an edit modal', 'info'); }
+
+document.getElementById('searchInput').addEventListener('input', () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => loadEmployees(1), 350);
 });
-
-function viewEmployee(id) { alert('Employee ID: ' + id + '\n(Full detail view — extend as needed)'); }
-
-let debounce;
-document.getElementById('searchInput').addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(() => loadEmployees(1), 350); });
 document.getElementById('statusFilter').addEventListener('change', () => loadEmployees(1));
+document.getElementById('salaryFilter').addEventListener('change', () => loadEmployees(1));
+document.getElementById('selectAll').addEventListener('change', function() {
+    document.querySelectorAll('#employeeTableBody input[type=checkbox]').forEach(cb => cb.checked = this.checked);
+});
 
 loadEmployees();
 </script>
