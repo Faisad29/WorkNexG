@@ -136,15 +136,19 @@ class WorkforceDemoSeeder extends Seeder
             ]
         );
 
-        app(AttendanceService::class)->checkIn([
-            'employee_id' => $employee->id,
-            'site_id' => $employee->site_id,
-            'attendance_date' => now()->toDateString(),
-            'check_in_time' => now(),
-            'check_in_latitude' => 24.7136,
-            'check_in_longitude' => 46.6753,
-            'is_manual_override' => false,
-        ]);
+        try {
+            app(AttendanceService::class)->checkIn([
+                'employee_id'         => $employee->id,
+                'site_id'             => $employee->site_id,
+                'attendance_date'     => now()->toDateString(),
+                'check_in_time'       => now(),
+                'check_in_latitude'   => 24.7136,
+                'check_in_longitude'  => 46.6753,
+                'is_manual_override'  => false,
+            ]);
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            $this->command->warn('Attendance record already exists for today — skipping.');
+        }
 
         app(\App\Domain\Audit\Services\AuditService::class)->record(
             action: 'seed_demo_data',
